@@ -1,0 +1,116 @@
+﻿@page "/SmolPage"
+@using System.Net.Http.Json;
+@using System.Text;
+@using System.Linq
+@using System.Collections.Generic
+@using System
+@using System.Web
+@using System.Web.Http
+@using Newtonsoft.Json;
+@using bibliotecaAestethic.Data
+@inject HttpClient _client;
+
+<MudButton OnClick="(args) => AgregarNuevoRegistro()" Variant="Variant.Filled" EndIcon="@Icons.Material.Filled.Send" Color="Color.Primary" >Add</MudButton>
+
+<MudDataGrid T="MG" Items="@MGs" ReadOnly="@_readOnly" EditMode="@(_isCellEditMode ? DataGridEditMode.Cell : DataGridEditMode.Form)"
+    StartedEditingItem="@StartedEditingItem" CancelledEditingItem="@CancelledEditingItem" CommittedItemChanges="@CommittedItemChanges"
+    Bordered="true" Dense="true" EditTrigger="@(_editTriggerRowClick ? DataGridEditTrigger.OnRowClick : DataGridEditTrigger.Manual)">
+    <Columns>
+        <Column T="MG" Field="id" IsEditable="false" />
+        <Column T="MG" Field="modelo" />
+        <Column T="MG" Field="nombre" />
+        <Column T="MG" Field="porcentajedefuncionamiento" />
+        <Column T="MG" Field="descripcion" />
+        <Column T="MG" Hidden="@(_isCellEditMode || _readOnly || _editTriggerRowClick)" CellClass="d-flex justify-end">
+            <CellTemplate>
+                <MudIconButton Size="@Size.Small" Icon="@Icons.Outlined.Edit" OnClick="@context.Actions.StartEditingItem" />
+                <MudIconButton Size="@Size.Small" Icon="@Icons.Outlined.Delete" OnClick="(args)=> OnDelete(context.Item)" />
+            </CellTemplate>
+        </Column>
+    </Columns>
+</MudDataGrid>
+
+
+@code {
+    [Inject] private IDialogService DialogService { get; set; }
+    [Inject] private ISnackbar SnackbarService { get; set; }
+
+
+    private IEnumerable<MG> MGs = new List<MG>();
+    private bool _readOnly;
+    private bool _isCellEditMode;
+    private List<string> _events = new();
+    private bool _editTriggerRowClick;
+
+    protected override async Task OnInitializedAsync()
+    {
+
+        var elemento = new List<MG>();
+        _client.BaseAddress = new Uri("https://localhost:7174/");
+        var requestMessage = new HttpRequestMessage(HttpMethod.Get, "MG/ConsultaMG");
+        var respuesta = await _client.SendAsync(requestMessage);
+        if(respuesta.StatusCode == System.Net.HttpStatusCode.OK)
+        {
+            var responseBody = await respuesta.Content.ReadAsStringAsync();
+            var ListasMG = System.Text.Json.JsonSerializer.Deserialize < List < MG >> (responseBody);
+            MGs = ListasMG;
+        }
+    }
+
+    public static class WebApiConfig
+    {
+        public static void Register(HttpConfiguration config)
+        {
+            config.MapHttpAttributeRoutes();
+        }
+    }
+
+    readonly IHttpClientFactory _httpClientFactory;
+
+
+    async void OnDelete(MG Item)
+    {
+        ((List<MG>)MGs).Remove(Item);
+        var elemento = new List<MG>();
+        var lostBook = new HttpRequestMessage(HttpMethod.Delete, "MG/DeleteMG?");
+        var answer = await _client.SendAsync(lostBook);
+        SnackbarService.Add("snake?, Snake?!, SNAAAAAAAAAKE?!", Severity.Error);
+    }
+
+    async void AgregarNuevoRegistro()
+    {
+        var MGo = new MG
+            {
+                creador = "N/A",
+                nombre = "N/A",
+                modelo = "N/A",
+                porcentajedefuncionamiento = 1,
+                descripcion = "N/A"
+            };
+        ((List<MG>)MGs).Add(MGo);
+        StateHasChanged();
+        var elemento = new List<MG>();
+        var newBook = new HttpRequestMessage(HttpMethod.Post, "MG/AgregarMG?Modelo=N/A&Nombre=N/A&Creador=N/A&PorcentajeDeFuncionamiento=1&Descripcion=N/A");
+        var answer = await _client.SendAsync(newBook);
+
+        SnackbarService.Add("New Metal Gear Implemented", Severity.Success);
+    }
+
+    // events
+    void StartedEditingItem(MG item)
+    {
+        _events.Insert(0, $"Event = StartedEditingItem, Data = {System.Text.Json.JsonSerializer.Serialize(item)}");
+    }
+
+    void CancelledEditingItem(MG item)
+    {
+        _events.Insert(0, $"Event = CancelledEditingItem, Data = {System.Text.Json.JsonSerializer.Serialize(item)}");
+    }
+    
+    //Guardado y actualizado
+    void CommittedItemChanges(MG item)
+    {
+        _events.Insert(0, $"Event = CommittedItemChanges, Data = {System.Text.Json.JsonSerializer.Serialize(item)}");
+    }
+}
+
